@@ -1,6 +1,8 @@
 use sea_orm_migration::prelude::*;
 
 /// Creates the Postgres schema owned by the `capture` module.
+///
+/// Forward-only: there is no `down`. A mistake is fixed by a new migration.
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -10,14 +12,6 @@ impl MigrationTrait for Migration {
         manager
             .get_connection()
             .execute_unprepared("CREATE SCHEMA IF NOT EXISTS capture")
-            .await?;
-        Ok(())
-    }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .get_connection()
-            .execute_unprepared("DROP SCHEMA IF EXISTS capture CASCADE")
             .await?;
         Ok(())
     }

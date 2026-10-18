@@ -1,6 +1,7 @@
 # Specs
 
-One folder per feature, grouped by the module that owns it:
+One folder per feature, grouped by the module that owns it. Work that spans modules (for example
+persistence or deployment) lives under `specs/platform/`:
 
 ```
 specs/<module>/<feature>/

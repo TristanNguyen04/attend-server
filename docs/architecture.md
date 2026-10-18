@@ -79,43 +79,51 @@ a snapshot so consumers never need to call the producer back.
 This procedure was verified against Loco and Postgres. Use it for every table.
 
 1. **Spec first.** The table follows from a requirement in `specs/` and the ER diagram.
-2. **Migration.** Add a file in `migration/src/<module>/`, named
-   `m<yyyymmdd>_<nnnnnn>_<what>.rs`, and list it in that folder's `mod.rs`. Always qualify the
-   table with the module's schema, use a UUID key with a database default, and write a real
-   `down`:
+2. **Schema test first.** Add the test to `tests/schema.rs` (it must fail: the table does not
+   exist yet). Tests that boot the app and touch the database must be `#[serial]`, because they
+   share one test database.
+3. **Migration as plain SQL, forward-only.** In `migration/src/<module>/` add two files and list
+   the Rust one in that folder's `mod.rs`:
 
-   ```rust
-   #[derive(DeriveIden)]
-   enum Terms { Table, Id, Name }
-
-   fn terms() -> (Alias, Terms) { (Alias::new("calendar"), Terms::Table) }
-
-   manager.create_table(
-       Table::create()
-           .table(terms())
-           .col(ColumnDef::new(Terms::Id).uuid().not_null().primary_key()
-               .default(Expr::cust("gen_random_uuid()")))
-           .col(ColumnDef::new(Terms::Name).string().not_null().unique_key())
-           .to_owned(),
-   ).await
+   ```
+   m<yyyymmdd>_<nnnnnn>_<what>_<module>.rs      # copy an existing wrapper
+   m<yyyymmdd>_<nnnnnn>_<what>_<module>.sql
    ```
 
-   Timestamps are `timestamp_with_time_zone()`. Do not use `cargo loco generate model`: it
-   assumes integer ids and the default schema.
-3. **Entity.** Apply the migration to a database, then generate the entity for that schema only:
+   The migration name must be unique across modules. There is **no `down`**: migrations only go
+   forward, and never edit one that has been merged. A mistake is fixed by a new migration. Write
+   the DDL by hand: schema-qualified
+   table, UUID key with a database default, `timestamptz` columns, and the trigger that keeps
+   `updated_at` correct:
+
+   ```sql
+   CREATE TABLE calendar.terms (
+       id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+       name       text        NOT NULL UNIQUE,
+       created_at timestamptz NOT NULL DEFAULT now(),
+       updated_at timestamptz NOT NULL DEFAULT now()
+   );
+   CREATE TRIGGER set_updated_at BEFORE UPDATE ON calendar.terms
+       FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+   ```
+
+   Value sets are `text` with a `CHECK`. References to another module's rows are plain `uuid`
+   columns with a comment naming the table, never a foreign key. Do not use
+   `cargo loco generate model`: it assumes integer ids and the default schema.
+4. **Entity.** Apply the migrations to a database, then generate the entities for that schema
+   only:
 
    ```
    sea-orm-cli generate entity \
      --database-url postgres://loco:loco@localhost:5440/attend_server_development \
-     --database-schema <module> -o src/modules/<module>/entities
+     --database-schema <module> --with-prelude none -o src/modules/<module>/entities
    ```
 
-   The result carries `schema_name = "<module>"`, a `Uuid` key and `DateTimeWithTimeZone`
-   columns. Register it in the module's `entities/mod.rs`. Never edit it by hand.
-4. **Use it in the same change.** An entity nothing uses makes `clippy -D warnings` fail with
-   dead-code errors, so add the model code that uses it together with the table.
-5. **Tests that boot the app and touch the database must be `#[serial]`** (from
-   `serial_test`): they share one test database and truncate it on boot.
+   The result carries `schema_name = "<module>"`, `Uuid` keys and `DateTimeWithTimeZone`
+   columns. The command rewrites `entities/mod.rs`: put back the header and
+   `#![allow(dead_code)]` that the other modules have (until the first model uses the entities,
+   unused entities otherwise fail `clippy -D warnings`). Never edit the generated files.
+5. **Green.** `cargo test` passes, including the new schema test.
 
 ## Test database
 
@@ -123,15 +131,16 @@ This procedure was verified against Loco and Postgres. Use it for every table.
 schema (`modules::truncate`), so each run starts with no data. It deliberately does **not** use
 `dangerously_recreate`: Loco implements that with SeaORM's `fresh`, which only drops tables in
 the default schema, so with a schema per module it fails with "relation already exists".
-Migrations are append-only. If a database ends up half-migrated, reset it with
-`docker compose down -v && docker compose up -d`.
+Migrations are forward-only and append-only. A migration that was merged is never edited, and
+there is no way to revert one (`tests/schema.rs` checks that a revert is refused). If a local
+database ends up half-migrated, reset it with `docker compose down -v && docker compose up -d`.
 
 ## Not built yet
 
 This scaffold contains the structure only. Everything below is built feature by feature, with
 a spec first (`docs/development-process.md`):
 
-- All tables, entities and their migrations (only the five module schemas exist).
+- Models, controllers and business rules. The tables and their entities exist, but nothing uses them yet.
 - The outbox, the in-process bus and the dispatcher.
 - Wiring the clock into the application context.
 - Authentication, the device-signed tap, and the policy edit guard.

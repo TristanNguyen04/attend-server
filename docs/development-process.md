@@ -66,3 +66,4 @@ cargo loco start                      # run the app locally
 | Scenarios (BDD) | `tests/features/<module>/<feature>.feature` |
 | Step definitions | `tests/steps/<module>.rs`; shared steps in `tests/steps/common.rs` |
 | Architecture rules | `tests/architecture.rs` |
+| Database schema (constraints, keys, value sets) | `tests/schema.rs` (no scenario: persistence has no user-visible behaviour) |
