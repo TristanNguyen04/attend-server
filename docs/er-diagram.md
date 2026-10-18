@@ -3,9 +3,9 @@
 Approved ER diagram. Each table belongs to one module and lives in that module's Postgres
 schema (see `docs/architecture.md`). References across modules are plain IDs.
 
-Every table also has `created_at` and `updated_at` (`timestamptz`), except the two
-lifecycle tables below, which are append-only and have only `created_at`:
-`device_lifecycle_items` and `attendance_record_lifecycle_items`.
+Every table also has `created_at` and `updated_at` (`timestamptz`), except the three
+lifecycle tables, which are append-only and have only `created_at`:
+`device_lifecycle_items`, `attendance_record_lifecycle_items` and `appeal_lifecycle_items`.
 
 ```mermaid
 erDiagram
@@ -117,11 +117,42 @@ erDiagram
 Foreign key lines that cross a module boundary in the picture are **IDs only** in the
 database (rule 6 in `docs/architecture.md`).
 
+## How it is stored
+
+The migrations in `migration/src/<module>/` create exactly this model. Choices that the diagram
+does not show (decided in `specs/platform/persistence/requirements.md`):
+
+- **Value sets** (`status`, `role`, `platform`, `source`, `result`) are `text` with a `CHECK`
+  constraint, not Postgres enums, so adding a value is a simple migration. The lifecycle tables
+  check `old_status` and `new_status` against the same set as their parent table.
+- **`updated_at`** is maintained by a database trigger (`public.set_updated_at()`), so every
+  writer is covered.
+- **References across modules** (for example `devices.term_id`, `class_sessions.course_id`,
+  `attendance_records.student_id`) are plain `uuid` columns with no foreign key. Foreign keys
+  exist only inside a module.
+- **Reasons**: `reason` is nullable on every lifecycle table. `changed_by` is null on
+  `attendance_record_lifecycle_items` for system changes, and not null on
+  `appeal_lifecycle_items`.
+- **`courses.policies`** is nullable: null means "not configured yet".
+- **`appeals.supporting_documents`** is `text[]`, not null, default empty.
+- **Overlapping sessions** are prevented by an exclusion constraint, which needs the
+  `btree_gist` extension (created by the `capture` migration).
+- **Indexes** besides keys and uniques: `devices(user_id)`, `device_lifecycle_items(device_id)`,
+  `course_members(user_id)`, `nfc_tags(room_id)`,
+  `class_sessions(course_id)`, `scan_events(session_id)`, `attendance_records(student_id)`,
+  `appeals(record_id)`, `attendance_record_lifecycle_items(record_id)` and
+  `appeal_lifecycle_items(appeal_id)`.
+
+Not decided yet, because the ER does not say: case-insensitive email uniqueness (raised in the
+identity feature's spec).
+
 ## Constraints
 
 | Table | Constraint |
 |---|---|
 | `devices` | Unique `(user_id, term_id)` where status is ACTIVE: one phone per account per term. Rebinding needs the latest device to be at least 7 days old. |
+| `rooms` | Unique `(building, room_code)` |
+| `courses` | Unique `(term_id, code)`; this also serves lookups by term |
 | `scan_events` | Unique `(device_id, tag_id, tag_counter)`, and unique `(tag_id, tag_counter)` where result is ACCEPTED |
 | `class_sessions` | `ends_at > starts_at`. No overlap per room among sessions with `cancelled_at` null. |
 | `attendance_records` | Unique `(session_id, student_id)` |

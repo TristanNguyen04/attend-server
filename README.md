@@ -55,5 +55,6 @@ CI runs the same three commands. Changes reach `main` through pull requests.
 
 ## Status
 
-This is the scaffold: the structure, tooling and test harness. Tables, features, the event
-outbox, authentication and deployment files are added feature by feature.
+The structure, tooling, test harness and the whole data model (14 tables with their
+constraints and generated entities) are in place. Features, the event outbox, authentication and
+deployment files are added feature by feature, spec first.
