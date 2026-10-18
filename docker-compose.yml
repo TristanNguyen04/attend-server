@@ -1,0 +1,24 @@
+# Local development database. Not used in production.
+# Start: docker compose up -d      Stop: docker compose down      Reset data: docker compose down -v
+services:
+  postgres:
+    image: postgres:16
+    container_name: attend_server_pg
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      POSTGRES_DB: attend_server_development
+    ports:
+      # 5440 on the host so it does not clash with a Postgres you may already run on 5432.
+      - "${POSTGRES_PORT:-5440}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loco -d attend_server_development"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

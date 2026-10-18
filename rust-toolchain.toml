@@ -1,0 +1,6 @@
+# Pin the compiler so every developer, CI and the Docker build use the same Rust.
+# Keep the Dockerfile's `FROM rust:<version>-slim-bookworm` in sync with this channel.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

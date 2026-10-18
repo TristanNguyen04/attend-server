@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Format, lint and test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: loco
+          POSTGRES_PASSWORD: loco
+          POSTGRES_DB: attend_server_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loco"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      LOCO_ENV: test
+      DATABASE_URL: postgres://loco:loco@localhost:5432/attend_server_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The compiler version lives in rust-toolchain.toml, the single source of truth.
+      - name: Install the pinned Rust toolchain
+        run: |
+          channel=$(grep '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy
+          rustup default "$channel"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test (unit, architecture, Cucumber)
+        run: cargo test

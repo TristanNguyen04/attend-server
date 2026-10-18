@@ -1,0 +1,31 @@
+# Production configuration (LOCO_ENV=production).
+# Anything that is a secret or an address takes NO default on purpose: the app refuses to boot
+# without it instead of falling back to something unsafe.
+# Required environment variables: DATABASE_URL, HOST.
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: <%= get_env(name="LOG_LEVEL", default="info") %>
+  format: json
+
+server:
+  port: <%= get_env(name="PORT", default="5150") %>
+  binding: <%= get_env(name="BINDING", default="0.0.0.0") %>
+  # The public URL of this service.
+  host: <%= get_env(name="HOST") %>
+
+workers:
+  mode: BackgroundAsync
+
+database:
+  uri: <%= get_env(name="DATABASE_URL") %>
+  enable_logging: <%= get_env(name="DB_LOGGING", default="false") %>
+  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="500") %>
+  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
+  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
+  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="10") %>
+  # The app migrates itself on boot, as in the course deployment guide.
+  # Migrations must stay backward compatible: old and new tasks overlap during a deploy.
+  auto_migrate: <%= get_env(name="DB_AUTO_MIGRATE", default="true") %>
+  dangerously_truncate: false
+  dangerously_recreate: false

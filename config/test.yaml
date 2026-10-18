@@ -1,0 +1,30 @@
+# Test configuration (LOCO_ENV=test). Used by `cargo test`, including the Cucumber run.
+# On every boot the app applies pending migrations, then empties all module tables
+# (`dangerously_truncate`, see `modules::truncate`), so each run starts from no data.
+# `dangerously_recreate` stays false: Loco implements it with SeaORM's `fresh`, which only drops
+# tables in the default schema, so it cannot reset our per-module schemas.
+logger:
+  enable: false
+  pretty_backtrace: true
+  level: debug
+  format: compact
+
+server:
+  port: 5150
+  host: http://localhost
+
+workers:
+  # Run jobs inline so tests do not need to wait for a background worker.
+  mode: ForegroundBlocking
+
+database:
+  # Matches docker-compose.yml. CI sets DATABASE_URL to its own Postgres service.
+  uri: <%= get_env(name="DATABASE_URL", default="postgres://loco:loco@localhost:5440/attend_server_test") %>
+  enable_logging: false
+  connect_timeout: <%= get_env(name="DB_CONNECT_TIMEOUT", default="500") %>
+  idle_timeout: <%= get_env(name="DB_IDLE_TIMEOUT", default="500") %>
+  min_connections: <%= get_env(name="DB_MIN_CONNECTIONS", default="1") %>
+  max_connections: <%= get_env(name="DB_MAX_CONNECTIONS", default="1") %>
+  auto_migrate: true
+  dangerously_truncate: true
+  dangerously_recreate: false
