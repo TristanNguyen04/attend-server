@@ -34,28 +34,40 @@ erDiagram
   TERMS { uuid id PK
           string name UK
           timestamptz starts_at
-          timestamptz ends_at }
+          timestamptz ends_at
+          timestamptz created_at
+          timestamptz updated_at }
   USERS { uuid id PK
           string email UK
           string full_name
           string password_hash
-          string status "INVITED | ACTIVE | SUSPENDED" }
+          string status "INVITED | ACTIVE | SUSPENDED"
+          timestamptz created_at
+          timestamptz updated_at }
   COURSES { uuid id PK
             uuid term_id FK
             string code
             string title
-            jsonb policies }
+            jsonb policies
+            timestamptz created_at
+            timestamptz updated_at }
   COURSE_MEMBERS { uuid course_id PK,FK
                    uuid user_id PK,FK
                    string role "STUDENT | TA | PROFESSOR"
-                   string status "ACTIVE | REMOVED" }
+                   string status "ACTIVE | REMOVED"
+                   timestamptz created_at
+                   timestamptz updated_at }
   ROOMS { uuid id PK
           string building
-          string room_code }
+          string room_code
+          timestamptz created_at
+          timestamptz updated_at }
   NFC_TAGS { uuid id PK
              string tag_uid UK
              uuid room_id FK
-             string status "ACTIVE | REVOKED" }
+             string status "ACTIVE | REVOKED"
+             timestamptz created_at
+             timestamptz updated_at }
   CLASS_SESSIONS { uuid id PK
                    uuid course_id FK
                    uuid room_id FK
@@ -63,14 +75,18 @@ erDiagram
                    timestamptz ends_at
                    timestamptz closed_at "early close"
                    timestamptz cancelled_at
-                   uuid created_by FK }
+                   uuid created_by FK
+                   timestamptz created_at
+                   timestamptz updated_at }
   DEVICES { uuid id PK
             uuid user_id FK
             uuid term_id FK
             string public_key UK
             string platform "IOS | ANDROID"
             string status "ACTIVE | REVOKED"
-            timestamptz attested_at "nullable" }
+            timestamptz attested_at "nullable"
+            timestamptz created_at
+            timestamptz updated_at }
   DEVICE_LIFECYCLE_ITEMS { uuid id PK
                            uuid device_id FK
                            string old_status "null on first row"
@@ -86,11 +102,15 @@ erDiagram
                 timestamptz received_at "server clock"
                 string source "ONLINE | OFFLINE"
                 string result "ACCEPTED | REJECTED"
-                string reason }
+                string reason
+                timestamptz created_at
+                timestamptz updated_at }
   ATTENDANCE_RECORDS { uuid id PK
                        uuid session_id FK
                        uuid student_id FK
-                       string status "CHECKED_IN | PRESENT | LATE | INCOMPLETE | ABSENT | EXCUSED" }
+                       string status "CHECKED_IN | PRESENT | LATE | INCOMPLETE | ABSENT | EXCUSED"
+                       timestamptz created_at
+                       timestamptz updated_at }
   ATTENDANCE_RECORD_LIFECYCLE_ITEMS { uuid id PK
                                       uuid record_id FK
                                       string old_status "null on first row"
@@ -104,7 +124,9 @@ erDiagram
             uuid record_id FK
             string reason
             string status "PENDING | APPROVED | REJECTED"
-            text_array supporting_documents }
+            text_array supporting_documents
+            timestamptz created_at
+            timestamptz updated_at }
   APPEAL_LIFECYCLE_ITEMS { uuid id PK
                            uuid appeal_id FK
                            string old_status "null on first row"
