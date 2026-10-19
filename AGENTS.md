@@ -19,8 +19,14 @@ over adding crates or wiring infrastructure by hand.
 ```
 src/app.rs              # Loco hooks: aggregates each module's routes, workers, tasks (no business logic)
 src/modules/<module>/   # calendar, identity, courses, capture, records
-    mod.rs, api.rs      # the only public surface of a module
-    controllers/ dtos/ entities/ handlers/ models/ workers/   # private to the module
+    mod.rs, api.rs      # the only public surface of a module (mod.rs: routes(); api.rs: what others may call)
+    errors.rs           # the module's error constructors (ApiError codes and messages)
+    <feature>/          # one folder per feature (identity: auth/, account/), same file names in each:
+        controller.rs   #   HTTP handlers
+        dto.rs          #   request and response shapes and their validation
+        service.rs      #   the logic
+        token.rs, extractor.rs   # only when a feature needs them
+    entities/           # generated from the migrated database; never edited by hand
 src/shared_lib/         # events envelope, clock, error envelope, policies contract
 migration/src/<module>/ # each module's migrations as .rs + .sql, forward-only; migration/src/lib.rs concatenates them
 config/*.yaml           # per-environment config (LOCO_ENV); secrets come from the environment
@@ -33,7 +39,13 @@ tests/schema.rs         # the data model as Postgres stores it (keys, value sets
 ## Module rules (details in `docs/architecture.md`)
 
 - Dependencies only point down: `calendar < identity < courses < capture < records`.
-- A module's internals are private. Other modules use only its `api.rs`.
+- A module's internals are private (`mod x;`, never `pub mod`). Other modules use only its
+  `api.rs`.
+- Inside a module, code is grouped by feature (a folder per feature such as `auth/`, `account/`)
+  with the same file names in each: `controller.rs` (HTTP handlers), `dto.rs` (request and
+  response shapes and their validation), `service.rs` (the logic), plus `token.rs`/`extractor.rs`-style
+  files only when a feature needs them. `entities/` is generated; `errors.rs` holds the module's
+  error constructors. Only `api.rs` and `routes()` are public.
 - Only the owning module touches its tables. Across modules, reference rows by **ID only**:
   no foreign keys and no joins across schemas.
 - Cross-module side effects go through events (outbox). Handlers are idempotent.

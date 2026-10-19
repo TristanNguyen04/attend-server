@@ -11,12 +11,24 @@
 
 mod steps;
 
-use std::{env, fs, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, env, fs, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
-use attend_server::app::App;
-use cucumber::{writer, World, WriterExt};
-use loco_rs::{app::AppContext, testing::prelude::boot_test, TestServer};
+use attend_server::{
+    app::App,
+    shared_lib::clock::{Clock, FixedClock},
+};
+use chrono::{DateTime, TimeZone, Utc};
+use cucumber::{
+    gherkin::{Feature, Rule, Scenario},
+    writer, World, WriterExt,
+};
+use loco_rs::{
+    app::{AppContext, Hooks},
+    testing::prelude::boot_test,
+    TestServer,
+};
 use tokio::sync::OnceCell;
+use uuid::Uuid;
 
 const FEATURES: &str = "tests/features";
 
@@ -24,10 +36,18 @@ const FEATURES: &str = "tests/features";
 /// would race on the migration table, so we boot once and share the result.
 static BOOTED: OnceCell<Booted> = OnceCell::const_new();
 
+/// Every scenario starts at this instant (see `reset_state`).
+fn start_time() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 10, 20, 9, 0, 0)
+        .single()
+        .expect("a valid instant")
+}
+
 #[derive(Clone)]
 struct Booted {
     server: Arc<TestServer>,
     ctx: AppContext,
+    clock: FixedClock,
 }
 
 async fn booted() -> Booted {
@@ -40,6 +60,12 @@ async fn booted() -> Booted {
                 .router
                 .clone()
                 .expect("the boot result should include a router");
+            // The app reads its clock from the shared store (the production initializer put a
+            // `SystemClock` there). Replace it with the world's `FixedClock` before any request:
+            // the store is shared with the router, so the app sees the swap.
+            let clock = FixedClock::new(start_time());
+            let app_clock: Arc<dyn Clock> = Arc::new(clock.clone());
+            boot.app_context.shared_store.insert(app_clock);
             let server = TestServer::new(
                 router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
             )
@@ -47,6 +73,7 @@ async fn booted() -> Booted {
             Booted {
                 server: Arc::new(server),
                 ctx: boot.app_context.clone(),
+                clock,
             }
         })
         .await
@@ -59,6 +86,12 @@ async fn booted() -> Booted {
 pub struct AppWorld {
     pub server: Arc<TestServer>,
     pub ctx: AppContext,
+    /// The clock the app uses. Steps move time with it; no scenario sleeps.
+    pub clock: FixedClock,
+    /// Ids of the accounts a scenario created, by email.
+    pub accounts: HashMap<String, Uuid>,
+    /// The access token of the last successful sign-in.
+    pub access_token: Option<String>,
     /// Status of the last HTTP response.
     pub last_status: Option<u16>,
     /// Parsed JSON body of the last HTTP response, if it had one.
@@ -79,10 +112,29 @@ impl AppWorld {
         Self {
             server: booted.server,
             ctx: booted.ctx,
+            clock: booted.clock,
+            accounts: HashMap::new(),
+            access_token: None,
             last_status: None,
             last_json: None,
         }
     }
+}
+
+/// Runs before every scenario: no data left over from the previous one, and time back at the
+/// start, so a Background can create the same account every time.
+fn reset_state<'a>(
+    _feature: &'a Feature,
+    _rule: Option<&'a Rule>,
+    _scenario: &'a Scenario,
+    world: &'a mut AppWorld,
+) -> Pin<Box<dyn Future<Output = ()> + 'a>> {
+    Box::pin(async move {
+        App::truncate(&world.ctx)
+            .await
+            .expect("failed to empty the test database");
+        world.clock.set(start_time());
+    })
 }
 
 /// Set this to a directory to also write `cucumber.json` (Cucumber JSON) and `cucumber.xml`
@@ -92,6 +144,7 @@ const REPORT_DIR_VAR: &str = "CUCUMBER_REPORT_DIR";
 #[tokio::main]
 async fn main() {
     let cucumber = AppWorld::cucumber()
+        .before(reset_state)
         // Scenarios share one database, so they run one at a time.
         .max_concurrent_scenarios(1);
 

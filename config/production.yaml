@@ -1,7 +1,7 @@
 # Production configuration (LOCO_ENV=production).
 # Anything that is a secret or an address takes NO default on purpose: the app refuses to boot
 # without it instead of falling back to something unsafe.
-# Required environment variables: DATABASE_URL, HOST.
+# Required environment variables: DATABASE_URL, HOST, JWT_SECRET (base64, at least 32 random bytes).
 logger:
   enable: true
   pretty_backtrace: false
@@ -29,3 +29,10 @@ database:
   auto_migrate: <%= get_env(name="DB_AUTO_MIGRATE", default="true") %>
   dangerously_truncate: false
   dangerously_recreate: false
+
+auth:
+  jwt:
+    # Signs access tokens (HS256). Base64, as Loco expects. No default on purpose.
+    secret: <%= get_env(name="JWT_SECRET") %>
+    # Lifetime of an access token in seconds (24 hours).
+    expiration: 86400

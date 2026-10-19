@@ -2,3 +2,4 @@
 //! that any feature may use. Add `mod <module>;` here when a module gets its first feature.
 
 mod common;
+mod identity;

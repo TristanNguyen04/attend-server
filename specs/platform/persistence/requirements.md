@@ -106,4 +106,4 @@ Columns that other rows are looked up by (the foreign key and reference-by-ID co
 | Q7 | Overlap rule for sessions | A Postgres exclusion constraint over `(room_id, tstzrange(starts_at, ends_at))`, which needs the `btree_gist` extension. |
 | Q8 | Unique `(building, room_code)` for rooms and `(term_id, code)` for courses | Both are unique, so two identical rooms cannot defeat the overlap rule and a term cannot list a course twice. |
 | Q10 | Down migrations | None. Every migration is forward-only (decided by the team): there are no `down` steps or `.down.sql` files, and a bad change is corrected by a new migration. A local database is reset with `docker compose down -v`. |
-| Q9 | Email case-insensitivity | **Not decided here.** The ER does not specify it; the identity feature spec decides. |
+| Q9 | Email case-insensitivity | **Decided in `specs/identity/sign-in` (Q5):** canonical form (trimmed, lower case) plus a `CHECK` constraint on `identity.users.email`. |
