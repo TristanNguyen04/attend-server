@@ -66,6 +66,12 @@ jobs:
         with:
           tool: cargo-llvm-cov@0.9.1
 
+      # The build cache can restore coverage data and instrumented binaries from an older build
+      # of another branch; merged into this run, they show code that no longer exists as
+      # uncovered. Start the coverage run from a clean slate.
+      - name: Clear old coverage data
+        run: cargo llvm-cov clean --workspace
+
       # One run for everything `cargo test` runs (unit, architecture, schema, Cucumber), with
       # coverage. CUCUMBER_REPORT_DIR makes the Cucumber harness also write cucumber.json and
       # cucumber.xml. A failing test or scenario fails this step, and so the job.
