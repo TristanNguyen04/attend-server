@@ -8,8 +8,8 @@ over adding crates or wiring infrastructure by hand.
 
 | File | Why |
 |---|---|
-| `constitution.md` | The rules: tests first, and the BDD/TDD order |
-| `docs/development-process.md` | The SDD, BDD, TDD loop and commands |
+| `constitution.md` | The rules: specs, scenarios and tests ship together; CI is the gate |
+| `docs/development-process.md` | The flow (spec, scenarios, tasks, build) and commands |
 | `docs/architecture.md` | Modules, dependency direction, data ownership |
 | `docs/er-diagram.md` | The approved data model |
 | `specs/README.md`, `tests/features/README.md` | Conventions for specs and scenarios |
@@ -25,7 +25,7 @@ src/shared_lib/         # events envelope, clock, error envelope, policies contr
 migration/src/<module>/ # each module's migrations as .rs + .sql, forward-only; migration/src/lib.rs concatenates them
 config/*.yaml           # per-environment config (LOCO_ENV); secrets come from the environment
 specs/<module>/<feature>/   # requirements.md + tasks.md (SDD)
-tests/features/<module>/    # Gherkin scenarios (BDD); steps in tests/steps/
+tests/features/<module>/    # Gherkin scenarios; steps in tests/steps/
 tests/architecture.rs   # fails the build if module dependencies point the wrong way
 tests/schema.rs         # the data model as Postgres stores it (keys, value sets, constraints)
 ```
@@ -48,8 +48,9 @@ tests/schema.rs         # the data model as Postgres stores it (keys, value sets
 
 ## How to work
 
-1. Follow `docs/development-process.md`: spec, scenarios, tasks, then one task at a time
-   (BDD red, TDD red, TDD green, BDD green). Never run past a failing test.
+1. Follow `docs/development-process.md`: spec, scenarios, tasks, then build a task or the whole
+   feature in one go (code, steps and unit tests together). We dropped the strict red/green
+   loop because it was way too slow for the project. Do not merge on a failing test.
 2. Specs change only through a human-reviewed commit. If a requirement is unclear, ask; do
    not guess.
 3. No breaking changes to existing endpoints.
