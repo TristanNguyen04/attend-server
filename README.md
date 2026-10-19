@@ -51,7 +51,9 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-CI runs the same three commands. Changes reach `main` through pull requests.
+CI runs the same three commands, with `cargo test` run under `cargo llvm-cov` so that it also
+publishes the Cucumber report and fails below 100% line coverage of the hand-written code (see
+"Commands" in `docs/development-process.md`). Changes reach `main` through pull requests.
 
 ## Status
 

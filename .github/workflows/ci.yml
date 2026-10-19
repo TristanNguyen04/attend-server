@@ -14,6 +14,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Code we do not write by hand, so it is not measured: the generated SeaORM entities and the
+  # thin binary entry point. Keep in sync with docs/development-process.md.
+  COVERAGE_IGNORE_REGEX: 'src/(modules/[^/]+/entities/|bin/main\.rs$)'
 
 jobs:
   check:
@@ -38,6 +41,8 @@ jobs:
     env:
       LOCO_ENV: test
       DATABASE_URL: postgres://loco:loco@localhost:5432/attend_server_test
+      # Where the Cucumber JSON/JUnit reports and the coverage reports are written.
+      REPORT_DIR: ${{ github.workspace }}/ci-reports
 
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +51,7 @@ jobs:
       - name: Install the pinned Rust toolchain
         run: |
           channel=$(grep '^channel' rust-toolchain.toml | cut -d'"' -f2)
-          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --component llvm-tools-preview
           rustup default "$channel"
 
       - uses: Swatinem/rust-cache@v2
@@ -57,5 +62,49 @@ jobs:
       - name: Lint
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Test (unit, architecture, Cucumber)
-        run: cargo test
+      - uses: taiki-e/install-action@v2.87.22
+        with:
+          tool: cargo-llvm-cov@0.9.1
+
+      # One run for everything `cargo test` runs (unit, architecture, schema, Cucumber), with
+      # coverage. CUCUMBER_REPORT_DIR makes the Cucumber harness also write cucumber.json and
+      # cucumber.xml. A failing test or scenario fails this step, and so the job.
+      # `-C link-dead-code` keeps functions that no test calls in the binaries; without it the
+      # linker drops them and they vanish from the report instead of counting as uncovered.
+      - name: Test with coverage (unit, architecture, schema, Cucumber)
+        env:
+          CUCUMBER_REPORT_DIR: ${{ env.REPORT_DIR }}/cucumber
+          RUSTFLAGS: -C link-dead-code
+        run: cargo llvm-cov --no-report
+
+      - name: Coverage report
+        run: |
+          mkdir -p "$REPORT_DIR/coverage"
+          cargo llvm-cov report --ignore-filename-regex "$COVERAGE_IGNORE_REGEX" \
+            --lcov --output-path "$REPORT_DIR/coverage/lcov.info"
+          cargo llvm-cov report --ignore-filename-regex "$COVERAGE_IGNORE_REGEX" \
+            --html --output-dir "$REPORT_DIR/coverage"
+          cargo llvm-cov report --ignore-filename-regex "$COVERAGE_IGNORE_REGEX" \
+            --json --summary-only --output-path "$REPORT_DIR/coverage/summary.json"
+          jq -r '.data[0].totals.lines
+            | "## Code coverage\n\n**Line coverage: \(.percent * 100 | round / 100)%** (\(.covered) of \(.count) lines)"' \
+            "$REPORT_DIR/coverage/summary.json" >> "$GITHUB_STEP_SUMMARY"
+
+      # Hand-written code must be fully covered. This fails the job below 100% of lines.
+      - name: Coverage gate (100% of lines)
+        run: |
+          cargo llvm-cov report --ignore-filename-regex "$COVERAGE_IGNORE_REGEX" \
+            --fail-under-lines 100 \
+            || { echo "::error::Line coverage of the hand-written code is below 100%. See the table above."; exit 1; }
+
+      - name: Cucumber summary
+        if: always()
+        run: python3 .github/scripts/cucumber_summary.py "$REPORT_DIR/cucumber/cucumber.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the Cucumber and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: test-reports
+          path: ${{ env.REPORT_DIR }}
+          if-no-files-found: warn

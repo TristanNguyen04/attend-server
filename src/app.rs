@@ -67,3 +67,41 @@ impl Hooks for App {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loco_rs::tests_cfg::app::get_app_context;
+
+    #[test]
+    fn the_app_is_named_after_the_crate() {
+        assert_eq!(App::app_name(), "attend_server");
+    }
+
+    #[test]
+    fn the_version_is_the_package_version_followed_by_the_build() {
+        let version = App::app_version();
+        let prefix = format!("{} (", env!("CARGO_PKG_VERSION"));
+        assert!(
+            version.starts_with(&prefix),
+            "unexpected version: {version}"
+        );
+        assert!(version.ends_with(')'), "unexpected version: {version}");
+    }
+
+    #[test]
+    fn no_task_is_registered_yet() {
+        let mut tasks = Tasks::default();
+        App::register_tasks(&mut tasks);
+        assert!(tasks.names().is_empty());
+    }
+
+    #[tokio::test]
+    async fn no_initializer_worker_or_seed_is_wired_yet() {
+        let ctx = get_app_context().await;
+
+        assert!(App::initializers(&ctx).await.unwrap().is_empty());
+        App::connect_workers(&ctx, &Queue::empty()).await.unwrap();
+        App::seed(&ctx, Path::new("")).await.unwrap();
+    }
+}
