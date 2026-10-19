@@ -37,15 +37,26 @@ def main(path):
 
     rows = []
     for feature in json.loads(report.read_text()):
+        # Cucumber JSON lists a scenario, then (when the feature has a Background) a separate
+        # "background" element that carries the same name. It belongs to that scenario: its steps
+        # count towards the scenario's status, and it is not a scenario of its own.
+        scenarios = []
         for element in feature.get("elements", []):
-            steps = element.get("steps", [])
+            if element.get("type") == "background" and scenarios:
+                scenarios[-1]["steps"] += element.get("steps", [])
+            else:
+                scenarios.append(
+                    {"name": element["name"], "steps": list(element.get("steps", []))}
+                )
+        for scenario in scenarios:
+            steps = scenario["steps"]
             errors = [
                 step["result"]["error_message"]
                 for step in steps
                 if step.get("result", {}).get("error_message")
             ]
             rows.append(
-                (feature["name"], element["name"], scenario_status(steps), errors)
+                (feature["name"], scenario["name"], scenario_status(steps), errors)
             )
 
     counts = {status: sum(1 for row in rows if row[2] == status) for status in ICON}
