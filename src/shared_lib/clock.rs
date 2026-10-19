@@ -67,6 +67,14 @@ mod tests {
     }
 
     #[test]
+    fn system_clock_reads_the_real_time() {
+        let before = Utc::now();
+        let now = SystemClock.now();
+        let after = Utc::now();
+        assert!(before <= now && now <= after);
+    }
+
+    #[test]
     fn fixed_clock_returns_the_time_it_was_given() {
         let clock = FixedClock::new(at(10, 0));
         assert_eq!(clock.now(), at(10, 0));

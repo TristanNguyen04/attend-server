@@ -50,7 +50,10 @@ loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.1.1" }
 rstest = { version = "0.25" }
 insta = { version = "1.34", features = ["redactions", "yaml", "filters"] }
-cucumber = { version = "0.21" }
+# The unit tests of `src/` use `#[tokio::test]`.
+tokio = { version = "1.45", features = ["macros"] }
+# `output-json` and `output-junit` provide the opt-in CI report writers (see tests/cucumber.rs).
+cucumber = { version = "0.21", features = ["output-json", "output-junit"] }
 
 # The Cucumber harness provides its own `main`, so the default test harness is off.
 # Run it with: cargo test --test cucumber

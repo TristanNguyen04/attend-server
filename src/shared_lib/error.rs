@@ -100,6 +100,38 @@ mod tests {
     }
 
     #[test]
+    fn each_constructor_picks_its_http_status() {
+        assert_eq!(
+            ApiError::bad_request("c", "m").status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            ApiError::forbidden("c", "m").status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            ApiError::not_found("c", "m").status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(ApiError::conflict("c", "m").status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn the_response_carries_the_status_and_the_json_envelope() {
+        let response = ApiError::forbidden("not_allowed", "No access").into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "code": "not_allowed", "message": "No access", "details": null })
+        );
+    }
+
+    #[test]
     fn details_are_optional_context() {
         let err = ApiError::bad_request("invalid_field", "Bad value")
             .with_details(serde_json::json!({ "field": "starts_at" }));

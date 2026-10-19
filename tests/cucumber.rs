@@ -2,6 +2,8 @@
 //!
 //! Run everything:      cargo test --test cucumber
 //! Run one feature:     cargo test --test cucumber -- --name "Health"
+//! With a report:       `CUCUMBER_REPORT_DIR=target/cucumber` cargo test --test cucumber
+//!                      (also writes cucumber.json and cucumber.xml there; CI does this)
 //!
 //! The real Loco app is booted once and driven over HTTP through an in-process test server,
 //! the same request path production uses. Features live in `tests/features/<module>/` and
@@ -9,12 +11,14 @@
 
 mod steps;
 
-use std::sync::Arc;
+use std::{env, fs, path::PathBuf, sync::Arc};
 
 use attend_server::app::App;
-use cucumber::World;
+use cucumber::{writer, World, WriterExt};
 use loco_rs::{app::AppContext, testing::prelude::boot_test, TestServer};
 use tokio::sync::OnceCell;
+
+const FEATURES: &str = "tests/features";
 
 /// Booting the app runs migrations against the shared test database. Doing that per scenario
 /// would race on the migration table, so we boot once and share the result.
@@ -81,13 +85,36 @@ impl AppWorld {
     }
 }
 
+/// Set this to a directory to also write `cucumber.json` (Cucumber JSON) and `cucumber.xml`
+/// (`JUnit`) there. Unset, the run prints to the console only. CI sets it.
+const REPORT_DIR_VAR: &str = "CUCUMBER_REPORT_DIR";
+
 #[tokio::main]
 async fn main() {
-    AppWorld::cucumber()
+    let cucumber = AppWorld::cucumber()
         // Scenarios share one database, so they run one at a time.
-        .max_concurrent_scenarios(1)
-        // An undefined or skipped step is a failure: BDD "red" must be visible.
-        .fail_on_skipped()
-        .run_and_exit("tests/features")
-        .await;
+        .max_concurrent_scenarios(1);
+
+    // `with_writer` replaces the writer, so `fail_on_skipped` comes after it in both branches.
+    // An undefined or skipped step is a failure: BDD "red" must be visible.
+    match env::var_os(REPORT_DIR_VAR).map(PathBuf::from) {
+        None => cucumber.fail_on_skipped().run_and_exit(FEATURES).await,
+        Some(dir) => {
+            fs::create_dir_all(&dir).expect("failed to create the report directory");
+            let create = |name: &str| {
+                fs::File::create(dir.join(name)).expect("failed to create a report file")
+            };
+            // The console output stays; the report writers receive the same events.
+            let writer = writer::Basic::stdout()
+                .summarized()
+                .tee::<AppWorld, _>(writer::Json::for_tee(create("cucumber.json")))
+                .tee::<AppWorld, _>(writer::JUnit::for_tee(create("cucumber.xml"), 0))
+                .normalized();
+            cucumber
+                .with_writer(writer)
+                .fail_on_skipped()
+                .run_and_exit(FEATURES)
+                .await;
+        }
+    }
 }

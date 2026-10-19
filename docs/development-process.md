@@ -58,6 +58,27 @@ cargo clippy --all-targets -- -D warnings
 cargo loco start                      # run the app locally
 ```
 
+Two more commands mirror what CI does (CI runs them in place of plain `cargo test`):
+
+```
+# Cucumber report: also writes cucumber.json and cucumber.xml to the directory
+CUCUMBER_REPORT_DIR=target/cucumber-report cargo test --test cucumber
+
+# Coverage: runs all tests, then fails below 100% of lines of the hand-written code
+rustup component add llvm-tools-preview && cargo install cargo-llvm-cov --locked   # once
+RUSTFLAGS="-C link-dead-code" cargo llvm-cov --no-report
+cargo llvm-cov report --ignore-filename-regex 'src/(modules/[^/]+/entities/|bin/main\.rs$)' \
+  --fail-under-lines 100
+cargo llvm-cov report --html              # optional: browse uncovered lines in target/llvm-cov/html
+```
+
+The regex leaves out only code we do not write by hand: the generated SeaORM entities and the
+thin binary entry point. Keep it in sync with `COVERAGE_IGNORE_REGEX` in
+`.github/workflows/ci.yml`. `-C link-dead-code` makes a function that no test calls show up as
+uncovered instead of disappearing from the report. The `migration` crate is not measured (the
+report covers the `attend_server` package only; the schema tests exercise the migrations). Write a test for new code rather than
+widening the regex.
+
 ## Where tests go
 
 | Kind | Location |
