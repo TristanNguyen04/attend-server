@@ -42,6 +42,11 @@ mod tests {
     use super::SystemClockInitializer;
     use crate::shared_lib::clock::{Clock, FixedClock};
 
+    #[test]
+    fn is_named() {
+        assert_eq!(SystemClockInitializer.name(), "system-clock");
+    }
+
     #[tokio::test]
     async fn installs_the_system_clock_when_there_is_none() {
         let ctx = get_app_context().await;

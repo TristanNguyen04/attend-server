@@ -1,9 +1,47 @@
-//! Validated sign-in input.
+//! Request and response shapes of the sign-in endpoint, and the validation of the request.
 
-use super::errors;
-use crate::{modules::identity::dtos::SignInRequest, shared_lib::error::ApiError};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+use crate::{modules::identity::errors, shared_lib::error::ApiError};
+
+/// `POST /api/auth/sign-in` request body.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct SignInRequest {
+    /// Missing, empty and blank are all rejected with `validation_failed`.
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
+/// `POST /api/auth/sign-in` response body.
+#[derive(Debug, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct SignInResponse {
+    pub access_token: String,
+    /// Always `"Bearer"`.
+    pub token_type: String,
+    /// Seconds until the access token expires.
+    #[ts(type = "number")]
+    pub expires_in: u64,
+}
+
+impl SignInResponse {
+    /// A response for a freshly issued access token.
+    #[must_use]
+    pub fn bearer(access_token: String, expires_in: u64) -> Self {
+        Self {
+            access_token,
+            token_type: "Bearer".to_string(),
+            expires_in,
+        }
+    }
+}
 
 /// An email and a password that are both present and not blank.
+#[derive(Debug)]
 pub(crate) struct Credentials {
     pub email: String,
     pub password: String,
@@ -51,11 +89,18 @@ mod tests {
     }
 
     fn offending(request: SignInRequest) -> serde_json::Value {
-        let err = Credentials::try_from(request)
-            .err()
-            .expect("validation fails");
+        let err = Credentials::try_from(request).unwrap_err();
         assert_eq!(err.body().code, "validation_failed");
         err.body().details.clone().expect("details")
+    }
+
+    #[test]
+    fn the_response_has_exactly_the_documented_fields() {
+        let response = SignInResponse::bearer("abc".to_string(), 86_400);
+        assert_eq!(
+            serde_json::to_value(response).unwrap(),
+            json!({ "access_token": "abc", "token_type": "Bearer", "expires_in": 86_400 })
+        );
     }
 
     #[test]

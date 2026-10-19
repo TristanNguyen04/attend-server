@@ -1,45 +1,10 @@
-//! Request and response types of this module's HTTP API.
+//! Request and response shapes of the account endpoints.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::entities::users;
-
-/// `POST /api/auth/sign-in` request body.
-#[derive(Debug, Deserialize, TS)]
-#[ts(export)]
-pub struct SignInRequest {
-    /// Missing, empty and blank are all rejected with `validation_failed`.
-    #[serde(default)]
-    pub email: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
-}
-
-/// `POST /api/auth/sign-in` response body.
-#[derive(Debug, PartialEq, Eq, Serialize, TS)]
-#[ts(export)]
-pub struct SignInResponse {
-    pub access_token: String,
-    /// Always `"Bearer"`.
-    pub token_type: String,
-    /// Seconds until the access token expires.
-    #[ts(type = "number")]
-    pub expires_in: u64,
-}
-
-impl SignInResponse {
-    /// A response for a freshly issued access token.
-    #[must_use]
-    pub fn bearer(access_token: String, expires_in: u64) -> Self {
-        Self {
-            access_token,
-            token_type: "Bearer".to_string(),
-            expires_in,
-        }
-    }
-}
+use crate::modules::identity::entities::users;
 
 /// `GET /api/me` response body: the caller's own profile. Never a password or a hash.
 #[derive(Debug, PartialEq, Eq, Serialize, TS)]
@@ -69,8 +34,7 @@ mod tests {
     use serde_json::json;
     use uuid::Uuid;
 
-    use super::{ProfileResponse, SignInResponse};
-    use crate::modules::identity::entities::users;
+    use super::*;
 
     #[test]
     fn the_profile_has_exactly_four_fields_and_never_the_hash() {
@@ -94,15 +58,6 @@ mod tests {
                 "full_name": "Alex Tan",
                 "status": "ACTIVE",
             })
-        );
-    }
-
-    #[test]
-    fn the_response_has_exactly_the_documented_fields() {
-        let response = SignInResponse::bearer("abc".to_string(), 86_400);
-        assert_eq!(
-            serde_json::to_value(response).unwrap(),
-            json!({ "access_token": "abc", "token_type": "Bearer", "expires_in": 86_400 })
         );
     }
 }

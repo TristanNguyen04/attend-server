@@ -10,12 +10,7 @@
 //!
 //! See `docs/architecture.md` for the module rules.
 
-mod controllers;
-mod dtos;
 mod entities;
-mod handlers;
-mod models;
-mod workers;
 
 pub mod api;
 
@@ -24,5 +19,5 @@ use loco_rs::controller::Routes;
 /// HTTP routes this module contributes to the application.
 #[must_use]
 pub fn routes() -> Vec<Routes> {
-    controllers::routes()
+    Vec::new()
 }

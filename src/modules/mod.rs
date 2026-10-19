@@ -46,3 +46,26 @@ pub async fn truncate(db: &DatabaseConnection) -> Result<(), DbErr> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use loco_rs::tests_cfg::db::dummy_connection;
+
+    use super::*;
+
+    #[test]
+    fn collects_the_routes_of_every_module() {
+        assert!(!routes().is_empty(), "identity contributes routes");
+        assert!(calendar::routes().is_empty());
+        assert!(courses::routes().is_empty());
+        assert!(capture::routes().is_empty());
+        assert!(records::routes().is_empty());
+    }
+
+    #[tokio::test]
+    async fn truncating_a_database_that_is_not_postgres_fails() {
+        // The statement is Postgres-only, so the dummy SQLite database refuses it.
+        let db = dummy_connection().await;
+        assert!(truncate(&db).await.is_err());
+    }
+}

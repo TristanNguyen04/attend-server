@@ -8,8 +8,7 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::errors;
-use crate::shared_lib::error::ApiError;
+use crate::{modules::identity::errors, shared_lib::error::ApiError};
 
 /// What an access token says. Nothing else goes in a token: no email, password or hash.
 #[derive(Debug, Serialize, Deserialize)]
@@ -135,8 +134,8 @@ mod tests {
     fn a_token_with_a_changed_signature_is_invalid() {
         let token = issue(Uuid::new_v4(), start(), 86_400, SECRET).unwrap();
         let (head, signature) = token.rsplit_once('.').unwrap();
-        let first = if signature.starts_with('A') { 'B' } else { 'A' };
-        let altered = format!("{head}.{first}{}", &signature[1..]);
+        let reversed: String = signature.chars().rev().collect();
+        let altered = format!("{head}.{reversed}");
         assert_eq!(code(verify(&altered, SECRET, start())), "invalid_token");
     }
 

@@ -124,6 +124,14 @@ mod tests {
             StatusCode::NOT_FOUND
         );
         assert_eq!(ApiError::conflict("c", "m").status(), StatusCode::CONFLICT);
+        assert_eq!(
+            ApiError::unauthorized("c", "m").status(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            ApiError::internal("c", "m").status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[tokio::test]

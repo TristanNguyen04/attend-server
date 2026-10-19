@@ -8,16 +8,14 @@ use axum::{
 };
 use loco_rs::app::AppContext;
 
+use super::token;
 use crate::{
-    modules::identity::{
-        entities::users,
-        models::{accounts, errors, tokens},
-    },
+    modules::identity::{account, entities::users, errors},
     shared_lib::error::ApiError,
 };
 
 /// The account a request is made as.
-pub(super) struct Authenticated(pub(super) users::Model);
+pub(crate) struct Authenticated(pub(crate) users::Model);
 
 /// The token of an `Authorization: Bearer <token>` header.
 fn bearer_token(headers: &HeaderMap) -> Option<&str> {
@@ -33,9 +31,9 @@ impl FromRequestParts<AppContext> for Authenticated {
     async fn from_request_parts(parts: &mut Parts, ctx: &AppContext) -> Result<Self, ApiError> {
         let token = bearer_token(&parts.headers).ok_or_else(errors::unauthenticated)?;
         let jwt = super::jwt_config(ctx)?;
-        let claims = tokens::verify(token, &jwt.secret, super::clock(ctx)?.now())?;
-        let account = accounts::find_by_id(&ctx.db, claims.sub).await?;
-        Ok(Self(accounts::require_active(account)?))
+        let claims = token::verify(token, &jwt.secret, super::clock(ctx)?.now())?;
+        let found = account::find_by_id(&ctx.db, claims.sub).await?;
+        Ok(Self(account::require_active(found)?))
     }
 }
 
@@ -46,7 +44,9 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::modules::identity::controllers::test_support::{context, start, SECRET};
+    use crate::modules::identity::test_support::{
+        context, insert_account, remove_clock, start, SECRET,
+    };
 
     fn headers(value: &'static str) -> HeaderMap {
         let mut headers = HeaderMap::new();
@@ -74,22 +74,38 @@ mod tests {
         assert_eq!(bearer_token(&not_text), None);
     }
 
-    /// The rejection code of a request with this `Authorization` header (`None`: no header).
-    async fn rejection(ctx: &AppContext, authorization: Option<String>) -> (u16, String) {
+    /// Runs the extractor for a request with this `Authorization` header (`None`: no header).
+    async fn extract(
+        ctx: &AppContext,
+        authorization: Option<String>,
+    ) -> Result<Authenticated, ApiError> {
         let mut request = Request::builder().uri("/api/me");
         if let Some(value) = authorization {
             request = request.header(AUTHORIZATION, value);
         }
         let (mut parts, ()) = request.body(()).unwrap().into_parts();
-        let err = Authenticated::from_request_parts(&mut parts, ctx)
-            .await
-            .err()
-            .expect("the request is rejected");
+        Authenticated::from_request_parts(&mut parts, ctx).await
+    }
+
+    async fn rejection(ctx: &AppContext, authorization: Option<String>) -> (u16, String) {
+        let err = extract(ctx, authorization).await.err().unwrap();
         (err.status().as_u16(), err.body().code.clone())
     }
 
-    fn token(lifetime_secs: u64) -> String {
-        tokens::issue(Uuid::new_v4(), start(), lifetime_secs, SECRET).unwrap()
+    fn bearer(subject: Uuid, lifetime_secs: u64) -> String {
+        let token = token::issue(subject, start(), lifetime_secs, SECRET).unwrap();
+        format!("Bearer {token}")
+    }
+
+    #[tokio::test]
+    async fn yields_the_account_of_a_valid_token() {
+        let (ctx, _) = context().await;
+        let alex = insert_account(&ctx.db, "alex@example.edu", "ACTIVE").await;
+        let Authenticated(account) = extract(&ctx, Some(bearer(alex.id, 100)))
+            .await
+            .ok()
+            .unwrap();
+        assert_eq!(account.id, alex.id);
     }
 
     #[tokio::test]
@@ -108,18 +124,48 @@ mod tests {
     #[tokio::test]
     async fn an_expired_token_is_rejected_by_the_clock() {
         let (ctx, clock) = context().await;
-        let header = Some(format!("Bearer {}", token(100)));
+        let alex = insert_account(&ctx.db, "alex@example.edu", "ACTIVE").await;
+        let header = Some(bearer(alex.id, 100));
         clock.advance(Duration::seconds(100));
         assert_eq!(rejection(&ctx, header).await, (401, "token_expired".into()));
     }
 
     #[tokio::test]
-    async fn a_valid_token_goes_on_to_the_database() {
-        // One second before expiry the token is accepted; the dummy database then fails,
-        // which is an `internal_error`.
+    async fn a_token_one_second_before_expiry_still_works() {
         let (ctx, clock) = context().await;
-        let header = Some(format!("Bearer {}", token(100)));
+        let alex = insert_account(&ctx.db, "alex@example.edu", "ACTIVE").await;
+        let header = Some(bearer(alex.id, 100));
         clock.advance(Duration::seconds(99));
+        assert!(extract(&ctx, header).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_token_of_an_account_that_is_not_active_is_refused() {
+        let (ctx, _) = context().await;
+        let alex = insert_account(&ctx.db, "alex@example.edu", "SUSPENDED").await;
+        let result = rejection(&ctx, Some(bearer(alex.id, 100))).await;
+        assert_eq!(result, (403, "account_not_active".into()));
+    }
+
+    #[tokio::test]
+    async fn a_token_of_a_missing_account_is_invalid() {
+        let (ctx, _) = context().await;
+        let result = rejection(&ctx, Some(bearer(Uuid::new_v4(), 100))).await;
+        assert_eq!(result, (401, "invalid_token".into()));
+    }
+
+    #[tokio::test]
+    async fn missing_configuration_is_an_internal_error() {
+        let (mut ctx, _) = context().await;
+        let header = Some(bearer(Uuid::new_v4(), 100));
+        ctx.config.auth = None;
+        assert_eq!(
+            rejection(&ctx, header.clone()).await,
+            (500, "internal_error".into())
+        );
+
+        let (ctx, _) = context().await;
+        remove_clock(&ctx);
         assert_eq!(
             rejection(&ctx, header).await,
             (500, "internal_error".into())
