@@ -33,12 +33,15 @@ sea-orm = { version = "2.0", features = [
 ] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
-uuid = { version = "1.6", features = ["v4"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
 # ts-rs derives the TypeScript bindings for the `dtos` (the typed JSON API
 # contract). Present for every db app; the SPA frontend consumes the exports,
 # and a headless app can still emit them for external consumers.
 ts-rs = { version = "12", features = ["chrono-impl", "serde-compat"] }
 include_dir = { version = "0.7" }
+# Access tokens are encoded and checked here, not with Loco's `JWT` helper, because that reads
+# the system time and tokens must use the injected `Clock`. Same major version as Loco's.
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
 [[bin]]
 name = "attend_server-cli"

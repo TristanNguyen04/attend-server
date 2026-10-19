@@ -23,6 +23,30 @@ async fn a_client_requests(world: &mut AppWorld, request: String) {
     world.last_json = serde_json::from_slice(response.as_bytes()).ok();
 }
 
+/// Sends `body` as JSON to `path` and records the status and JSON of the response.
+pub async fn post_json(world: &mut AppWorld, path: &str, body: &serde_json::Value) {
+    let response = world.server.post(path).json(body).await;
+    world.last_status = Some(response.status_code().as_u16());
+    world.last_json = serde_json::from_slice(response.as_bytes()).ok();
+}
+
+/// Sends a GET with `Authorization: Bearer <token>` and records the status and JSON of the
+/// response.
+pub async fn get_with_bearer(world: &mut AppWorld, path: &str, token: &str) {
+    let response = world
+        .server
+        .get(path)
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await;
+    world.last_status = Some(response.status_code().as_u16());
+    world.last_json = serde_json::from_slice(response.as_bytes()).ok();
+}
+
+/// In Gherkin tables `{space}` stands for one space, because table cells are trimmed.
+pub fn expand_space(cell: &str) -> String {
+    cell.replace("{space}", " ")
+}
+
 #[then(expr = "the response status is {int}")]
 fn the_response_status_is(world: &mut AppWorld, expected: u16) {
     assert_eq!(

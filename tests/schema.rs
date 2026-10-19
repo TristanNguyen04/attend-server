@@ -689,6 +689,58 @@ async fn natural_keys_are_unique() {
     rejected(&db, &member, UNIQUE).await;
 }
 
+/// An insert into `identity.users` with this SQL expression as the email.
+fn user_with_email_sql(email_expr: &str) -> String {
+    format!(
+        "INSERT INTO identity.users (email, full_name, password_hash, status)
+         VALUES ({email_expr}, 'Test User', 'hash', 'ACTIVE')"
+    )
+}
+
+#[tokio::test]
+#[serial]
+async fn user_emails_are_stored_trimmed_and_lower_case() {
+    let db = db().await;
+    for email in [
+        "'Alex@Example.edu'",
+        "' alex@example.edu'",
+        "'alex@example.edu '",
+        "E'\\talex@example.edu'",
+        "E'alex@example.edu\\n'",
+    ] {
+        rejected(&db, &user_with_email_sql(email), CHECK).await;
+    }
+    ok(&db, &user_with_email_sql("'alex@example.edu'")).await;
+}
+
+/// The code trims with `str::trim`; the constraint must treat exactly the same characters as
+/// whitespace, or an email the code accepts could be refused by the database (or the reverse).
+#[tokio::test]
+#[serial]
+async fn the_email_constraint_trims_the_same_characters_as_the_code() {
+    let db = db().await;
+    for c in (0..=0xFFFF_u32)
+        .filter_map(char::from_u32)
+        .filter(|c| c.is_whitespace())
+    {
+        let code = u32::from(c);
+        rejected(
+            &db,
+            &user_with_email_sql(&format!("E'\\u{code:04x}alex@example.edu'")),
+            CHECK,
+        )
+        .await;
+        rejected(
+            &db,
+            &user_with_email_sql(&format!("E'alex@example.edu\\u{code:04x}'")),
+            CHECK,
+        )
+        .await;
+    }
+    // Whitespace inside the address is not trimmed, so the constraint leaves it alone.
+    ok(&db, &user_with_email_sql("'a b@example.edu'")).await;
+}
+
 #[tokio::test]
 #[serial]
 async fn a_user_can_have_only_one_active_device_per_term() {

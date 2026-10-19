@@ -48,6 +48,11 @@ impl ApiError {
     }
 
     #[must_use]
+    pub fn unauthorized(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, code, message)
+    }
+
+    #[must_use]
     pub fn forbidden(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(StatusCode::FORBIDDEN, code, message)
     }
@@ -60,6 +65,11 @@ impl ApiError {
     #[must_use]
     pub fn conflict(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self::new(StatusCode::CONFLICT, code, message)
+    }
+
+    #[must_use]
+    pub fn internal(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, code, message)
     }
 
     /// Attach structured context.
@@ -129,6 +139,21 @@ mod tests {
             json,
             serde_json::json!({ "code": "not_allowed", "message": "No access", "details": null })
         );
+    }
+
+    #[test]
+    fn unauthorized_is_a_401_with_the_given_code() {
+        let err = ApiError::unauthorized("unauthenticated", "Sign in first");
+        assert_eq!(err.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(err.body().code, "unauthenticated");
+        assert_eq!(err.body().message, "Sign in first");
+    }
+
+    #[test]
+    fn internal_is_a_500_with_the_given_code() {
+        let err = ApiError::internal("internal_error", "Something went wrong");
+        assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.body().code, "internal_error");
     }
 
     #[test]

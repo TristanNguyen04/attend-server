@@ -50,6 +50,16 @@ Small, stable code every module may use: the event `Envelope`, the `Clock`, the 
 envelope, and the typed `CoursePolicies` contract. It depends on **no module**, holds no
 business rules, and changes there need review from every team.
 
+## Authentication (`identity`)
+
+Clients sign in with `POST /api/auth/sign-in` (email and password) and send the returned signed
+token (JWT, HS256) as `Authorization: Bearer <token>` on later requests. The token carries only
+the account id, when it was issued and when it expires, both taken from the `Clock`. The
+signing secret and the lifetime are `auth.jwt` in `config/*.yaml`; in production the secret comes
+only from the environment variable `JWT_SECRET`. Handlers that need a signed-in user take the
+`identity` module's authentication extractor, which answers with the `ApiError` envelope.
+Details: `specs/identity/sign-in/requirements.md`.
+
 ## Policy edit guard (design, not built yet)
 
 `courses` owns `policies` but cannot know about sessions without depending on a lower layer

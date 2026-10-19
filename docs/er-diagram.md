@@ -152,6 +152,10 @@ does not show (decided in `specs/platform/persistence/requirements.md`):
 - **References across modules** (for example `devices.term_id`, `class_sessions.course_id`,
   `attendance_records.student_id`) are plain `uuid` columns with no foreign key. Foreign keys
   exist only inside a module.
+- **Canonical email**: `users.email` is stored trimmed and lower case. The identity module
+  normalises it before every lookup, and the `users_email_canonical` `CHECK` constraint refuses
+  anything else, so plain `UNIQUE` is enough for case-insensitive uniqueness (decided in
+  `specs/identity/sign-in`, Q5).
 - **Reasons**: `reason` is nullable on every lifecycle table. `changed_by` is null on
   `attendance_record_lifecycle_items` for system changes, and not null on
   `appeal_lifecycle_items`.
@@ -164,9 +168,6 @@ does not show (decided in `specs/platform/persistence/requirements.md`):
   `class_sessions(course_id)`, `scan_events(session_id)`, `attendance_records(student_id)`,
   `appeals(record_id)`, `attendance_record_lifecycle_items(record_id)` and
   `appeal_lifecycle_items(appeal_id)`.
-
-Not decided yet, because the ER does not say: case-insensitive email uniqueness (raised in the
-identity feature's spec).
 
 ## Constraints
 

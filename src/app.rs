@@ -12,7 +12,7 @@ use loco_rs::{
 use migration::Migrator;
 use std::path::Path;
 
-use crate::modules;
+use crate::{initializers::clock::SystemClockInitializer, modules};
 
 /// The Loco application. This file only aggregates what each module contributes;
 /// keep business logic out of it.
@@ -43,7 +43,7 @@ impl Hooks for App {
     }
 
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
-        Ok(vec![])
+        Ok(vec![Box::new(SystemClockInitializer)])
     }
 
     fn routes(_ctx: &AppContext) -> AppRoutes {
@@ -97,10 +97,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_initializer_worker_or_seed_is_wired_yet() {
+    async fn only_the_clock_initializer_is_wired_and_no_worker_or_seed_yet() {
         let ctx = get_app_context().await;
 
-        assert!(App::initializers(&ctx).await.unwrap().is_empty());
+        let initializers = App::initializers(&ctx).await.unwrap();
+        let names: Vec<_> = initializers.iter().map(|i| i.name()).collect();
+        assert_eq!(names, ["system-clock"]);
         App::connect_workers(&ctx, &Queue::empty()).await.unwrap();
         App::seed(&ctx, Path::new("")).await.unwrap();
     }

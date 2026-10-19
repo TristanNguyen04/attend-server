@@ -28,3 +28,11 @@ database:
   auto_migrate: true
   dangerously_truncate: true
   dangerously_recreate: false
+
+auth:
+  jwt:
+    # Signs access tokens (HS256). Base64, as Loco expects. A fixed, public, fake value for local use
+    # only (it decodes to readable text); production reads JWT_SECRET from the environment.
+    secret: ZGV2LWFuZC10ZXN0LW9ubHktand0LXNlY3JldC1uZXZlci11c2VkLWluLXByb2R1Y3Rpb24hIQ==
+    # Lifetime of an access token in seconds (24 hours).
+    expiration: 86400
