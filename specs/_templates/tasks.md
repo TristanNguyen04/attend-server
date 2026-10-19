@@ -1,19 +1,17 @@
 # Tasks: <feature name>
 
 Derived from `requirements.md` and `tests/features/<module>/<feature>.feature`.
-One task per scenario, in the constitution's order:
-**BDD red -> TDD red -> TDD green -> BDD green**.
+A short list of work items. Each names the requirements and scenarios it covers. Build a task
+(or several) in one go: code, step definitions and unit tests together, in any order.
 
 ---
 
-## T1: <scenario title>  ·  FR<n>
-Scenario: *<scenario title>*
+## T1: <work item>  ·  FR<n>
+Scenarios: *<scenario titles>*
 
-- **BDD red**: write the step definitions for the whole scenario against real behaviour.
-  Run `cargo test --test cucumber`; it must fail because <the expected reason>.
-- **TDD red**: write a failing unit test that <asserts the smallest missing behaviour>.
-- **TDD green**: <the minimal implementation>.
-- **BDD green**: run `cargo test --test cucumber`; the scenario passes.
+- <what to build, including any groundwork that lands here because this is the first item
+  that needs it>
+- <what the scenarios and unit tests must show>
 
 ## T2: ...
 
@@ -21,3 +19,5 @@ Scenario: *<scenario title>*
 
 ## Cross-cutting notes
 - <ordering constraints, prerequisites such as a migration, shared helpers>
+- Done when fmt, clippy, all tests and the coverage gate are green (see
+  `docs/development-process.md`).

@@ -6,7 +6,7 @@ persistence or deployment) lives under `specs/platform/`:
 ```
 specs/<module>/<feature>/
 ├── requirements.md   # what and why (reviewed by a human before any code)
-└── tasks.md          # one task per scenario, each with its four steps
+└── tasks.md          # a short list of work items, each naming its requirements and scenarios
 ```
 
 Start a feature by copying `_templates/`. The method is described in

@@ -1,40 +1,45 @@
-# Development process: SDD, BDD, TDD
+# Development process: spec, scenarios, tasks, tests
 
-We build every feature in three layers, each driving the next.
+We keep the course's artefacts and drop its strict loop. Each artefact answers one question:
 
-| Layer | Question it answers | Artefact | Lives in |
-|---|---|---|---|
-| **SDD** (spec-driven) | What must the system do, and why? | Requirements, decisions, tasks | `specs/<module>/<feature>/` |
-| **BDD** (behaviour-driven) | How does a user see it behave? | Gherkin scenarios and step definitions | `tests/features/<module>/`, `tests/steps/` |
-| **TDD** (test-driven) | Does this unit of code do its job? | Unit tests next to the code | `#[cfg(test)]` inside `src/` |
+| Artefact | Question it answers | Lives in |
+|---|---|---|
+| **Spec** | What must the system do, and why? | `specs/<module>/<feature>/requirements.md` |
+| **Scenarios** (Gherkin) | How does a user see it behave? | `tests/features/<module>/`, steps in `tests/steps/` |
+| **Tasks** | What are the work items, in what order? | `specs/<module>/<feature>/tasks.md` |
+| **Unit tests** | Does this piece of code do its job? | `#[cfg(test)]` inside `src/` |
 
-## The loop for one feature
+## The flow for one feature
 
 1. **Spec.** Write `specs/<module>/<feature>/requirements.md` from the template: the user
    story, definitions, numbered requirements (FR1, FR2, ... in EARS form), non-functional
-   requirements and a table of decisions. A human reviews and commits it. Specs change only
-   through a reviewed commit.
-2. **Scenarios.** Write `tests/features/<module>/<feature>.feature`. Cover the happy path,
-   the sad paths and the permission cases. Tag each scenario with its story and requirement,
-   for example `@US-SES-01 @FR2`.
-3. **Tasks.** Write `specs/<module>/<feature>/tasks.md`: one task per scenario, each listing
-   its four steps. Order tasks so shared groundwork (a migration, a table) lands when first
-   needed.
-4. **Implement one task at a time**, in this order (the constitution):
+   requirements and a table of decisions. A human reviews it. Specs change only through a
+   reviewed commit.
+2. **Scenarios.** Write `tests/features/<module>/<feature>.feature`: the happy path, the sad
+   paths and the permission cases. Tag each scenario with its requirement, for example
+   `@FR2`.
+3. **Tasks.** Write `specs/<module>/<feature>/tasks.md`: a short list of work items, each
+   naming the requirements and scenarios it covers. Group them so that shared groundwork (a
+   migration, configuration) lands in the first item that needs it.
+4. **Build.** Implement a task or the whole feature in one go: code, step definitions and unit
+   tests together, in whatever order is fastest. Run the quick checks as you go.
+5. **Done** when `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings` and
+   `cargo test` (unit tests, the architecture test and all Cucumber scenarios) are green, line
+   coverage of hand-written code is 100% in CI, and the pull request is reviewed.
 
-   | Step | What you do | Command | Expected |
-   |---|---|---|---|
-   | BDD red | Write the scenario's step definitions against real behaviour | `cargo test --test cucumber` | Fails, for the right reason |
-   | TDD red | Write a failing unit test for the smallest missing piece | `cargo test --lib` | Fails |
-   | TDD green | Write the minimum code to pass it | `cargo test --lib` | Passes |
-   | (refactor) | Clean up while the tests stay green | `cargo test --lib` | Passes |
-   | BDD green | Run the scenario again | `cargo test --test cucumber` | Passes |
+## Why we dropped the strict loop
 
-   Repeat the TDD steps as often as the scenario needs. Never move to the next task while a
-   test is failing.
-5. **Done** when all of these hold: `cargo fmt --all -- --check`, `cargo clippy
-   --all-targets -- -D warnings`, `cargo test` (this runs unit tests, the architecture test
-   and Cucumber) are green, and the pull request is reviewed.
+We tried the course's method literally: for every scenario, write the steps and watch them
+fail (BDD red), write a failing unit test (TDD red), make it pass (TDD green), re-run the
+scenario (BDD green), one task per prompt, with evidence of every red. **It was way too slow for
+project development.** It multiplied builds and test runs, forced a review round trip per
+scenario, and added nothing the CI gates do not already guarantee: a scenario that does not
+assert the right thing, or code that no test covers, is caught by the scenarios themselves and
+by the 100% coverage gate.
+
+What stays: the spec with numbered requirements, the `.feature` files with tags, the task list,
+tests for every behaviour, and the CI gates. What goes: the mandatory red/green order, the
+one-scenario-per-prompt rule, and the per-step evidence.
 
 ## Traceability
 

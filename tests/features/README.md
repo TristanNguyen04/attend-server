@@ -1,4 +1,4 @@
-# Feature files (BDD)
+# Feature files
 
 Gherkin scenarios that describe behaviour in the language of the domain. They are executable
 by `cargo test --test cucumber`.
@@ -34,5 +34,5 @@ Step definitions live in `tests/steps/<module>.rs`. Steps used by many features 
 
 ## Order of work
 
-Write the scenario, then its steps, run it and watch it fail (BDD red), then implement with
-unit tests (TDD). See `docs/development-process.md`.
+Write the scenarios, then build the feature with its steps and unit tests together. There is no
+mandatory fail-first order. See `docs/development-process.md`.
